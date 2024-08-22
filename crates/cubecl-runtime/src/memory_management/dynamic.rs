@@ -19,8 +19,8 @@ pub struct DynamicMemoryManagement<Storage> {
 /// Options to initialize a [dynamic memory management](DynamicMemoryManagement).
 #[derive(new, Debug)]
 pub struct DynamicMemoryManagementOptions {
-    pools: Vec<MemoryPoolOptions>,
-    min_chunk_alignment_offset: usize,
+    pub pools: Vec<MemoryPoolOptions>,
+    pub min_chunk_alignment_offset: usize,
 }
 
 /// Options to create a memory pool.
@@ -141,12 +141,14 @@ impl<Storage: ComputeStorage> MemoryManagement<Storage> for DynamicMemoryManagem
 
     fn reserve(&mut self, size: usize, exclude: &[StorageId]) -> Self::Handle {
         if size <= self.min_chunk_alignment_offset {
+            println!("Small {exclude:?}");
             return self
                 .small_memory_pool
                 .reserve(&mut self.storage, size, exclude);
         }
 
         for (index, option) in self.options.iter().enumerate() {
+            println!("Other {exclude:?}");
             if size <= option.slice_max_size {
                 let pool = &mut self.pools[index];
                 return pool.reserve(&mut self.storage, size, exclude);

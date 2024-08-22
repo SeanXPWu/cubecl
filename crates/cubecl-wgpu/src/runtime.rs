@@ -118,14 +118,20 @@ fn create_client(
 > {
     let limits = device_wgpu.limits();
     let storage = WgpuStorage::new(device_wgpu.clone());
-    let memory_management = DynamicMemoryManagement::new(
-        storage,
-        DynamicMemoryManagementOptions::preset(
-            limits.max_storage_buffer_binding_size as usize,
-            limits.min_storage_buffer_offset_alignment as usize,
-        ),
+    let mm_options = DynamicMemoryManagementOptions::preset(
+        limits.max_storage_buffer_binding_size as usize,
+        limits.min_storage_buffer_offset_alignment as usize,
     );
-    let server = WgpuServer::new(memory_management, device_wgpu, queue, options.tasks_max);
+
+    let metadata_buffer_size_threshold = find_metadata_buffer_size_threshold(&mm_options);
+    let memory_management = DynamicMemoryManagement::new(storage, mm_options);
+    let server = WgpuServer::new(
+        memory_management,
+        device_wgpu,
+        queue,
+        options.tasks_max,
+        metadata_buffer_size_threshold,
+    );
     let channel = MutexComputeChannel::new(server);
 
     let features = adapter.features();
@@ -304,4 +310,30 @@ fn select_adapter<G: GraphicsApi>(device: &WgpuDevice) -> wgpu::Adapter {
     log::info!("Using adapter {:?}", adapter.get_info());
 
     adapter
+}
+
+fn find_metadata_buffer_size_threshold(options: &DynamicMemoryManagementOptions) -> usize {
+    let mut metadata_buffer_size_threshold = 0;
+
+    for pool in options.pools.iter() {
+        if could_be_metadata(pool.slice_max_size)
+            && pool.slice_max_size > metadata_buffer_size_threshold
+        {
+            metadata_buffer_size_threshold = pool.chunk_size;
+        }
+
+        if metadata_buffer_size_threshold == 0 {
+            metadata_buffer_size_threshold = pool.chunk_size;
+        }
+    }
+
+    metadata_buffer_size_threshold
+}
+
+fn could_be_metadata(buffer_size_bytes: usize) -> bool {
+    static MAX_RANK: usize = 7;
+    static MAX_HANDLE_PER_SHADER: usize = 15;
+    static BYTE_PER_HANDLE: usize = 2 * 4;
+
+    buffer_size_bytes <= MAX_RANK * MAX_HANDLE_PER_SHADER * BYTE_PER_HANDLE
 }

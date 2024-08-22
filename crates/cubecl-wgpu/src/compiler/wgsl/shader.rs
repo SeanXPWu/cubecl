@@ -82,15 +82,18 @@ pub struct ComputeShader {
 
 impl Display for ComputeShader {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Self::format_bindings(f, "input", &self.inputs, 0)?;
-        Self::format_bindings(f, "output", &self.outputs, self.inputs.len())?;
+        Self::format_bindings(f, "input", &self.inputs, 0, true)?;
+        Self::format_bindings(f, "output", &self.outputs, self.inputs.len(), true)?;
 
         for (i, (name, binding)) in self.named.iter().enumerate() {
+            let force_read_write = name != "info"; // We have to set the info buffer to read.
+
             Self::format_binding(
                 f,
                 name.as_str(),
                 binding,
                 self.inputs.len() + self.outputs.len() + i,
+                force_read_write,
             )?;
         }
 
@@ -180,6 +183,7 @@ impl ComputeShader {
         prefix: &str,
         bindings: &[Binding],
         num_entry: usize,
+        force_read_write: bool,
     ) -> core::fmt::Result {
         for (i, binding) in bindings.iter().enumerate() {
             Self::format_binding(
@@ -187,6 +191,7 @@ impl ComputeShader {
                 format!("{prefix}_{i}_global").as_str(),
                 binding,
                 num_entry + i,
+                force_read_write,
             )?;
         }
 
@@ -198,10 +203,16 @@ impl ComputeShader {
         name: &str,
         binding: &Binding,
         num_entry: usize,
+        force_read_write: bool,
     ) -> core::fmt::Result {
         let ty = match binding.size {
             Some(size) => format!("array<{}, {}>", binding.item, size),
             None => format!("array<{}>", binding.item),
+        };
+
+        let visibility = match force_read_write {
+            true => Visibility::ReadWrite,
+            false => binding.visibility,
         };
 
         f.write_fmt(format_args!(
@@ -209,7 +220,7 @@ impl ComputeShader {
 @binding({})
 var<{}, {}> {}: {};
 \n",
-            num_entry, binding.location, binding.visibility, name, ty
+            num_entry, binding.location, visibility, name, ty
         ))?;
 
         Ok(())
@@ -228,7 +239,7 @@ impl Display for Location {
 impl Display for Visibility {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Visibility::Read => f.write_str("read_write"),
+            Visibility::Read => f.write_str("read"),
             Visibility::ReadWrite => f.write_str("read_write"),
         }
     }
