@@ -2,11 +2,11 @@ use cubecl_core as cubecl;
 use cubecl_core::prelude::*;
 
 use super::{
-    base::{RuntimeCmmaInfo, SharedMemories},
+    base::{Accumulators, Dimensions, Offsets, SharedMemories},
     compute_loop::compute_loop,
-    config::ComptimeCmmaInfo,
+    config::CmmaConfig,
     load_shared_memory::load_to_shared_memories,
-    write_output::{base::OutputWriter, large_smem::LargeSmemWriter, reuse_smem::ReuseSmemWriter},
+    write_output::write_to_output,
 };
 
 #[cube]
@@ -14,45 +14,26 @@ pub(crate) fn block_loop<F: Float, FC: Float>(
     lhs: &Tensor<F>,
     rhs: &Tensor<F>,
     out: &mut Tensor<F>,
+    mut offsets: Offsets,
     shared_memories: SharedMemories<FC>,
-    mut accumulators: Sequence<cmma::Matrix<F>>,
-    runtime_info: RuntimeCmmaInfo,
-    comptime_info: Comptime<ComptimeCmmaInfo>,
+    accumulators: Accumulators<F>,
+    config: Comptime<CmmaConfig>,
+    dims: Dimensions,
 ) {
-    let block_size_k = Comptime::runtime(Comptime::map(comptime_info, |c| c.block_size_k));
-    let write_out_reuse_smem = Comptime::map(comptime_info, |c| c.write_out_reuse_smem);
+    let block_size_k = Comptime::runtime(Comptime::map(config, |c| c.block_size_k));
+    let n_loops = (dims.k + block_size_k - 1) / block_size_k;
 
-    // Equals ceil(dims.k / block_size_k)
-    let dims = runtime_info.dims;
-    let num_loops = (dims.k + block_size_k - 1) / block_size_k;
+    for block in range(0u32, n_loops, Comptime::new(false)) {
+        offsets.k = block * block_size_k;
 
-    for block in range(0u32, num_loops, Comptime::new(false)) {
-        let k_offset = block * block_size_k;
-
-        load_to_shared_memories::<F, FC>(
-            lhs,
-            rhs,
-            k_offset,
-            shared_memories,
-            runtime_info,
-            comptime_info,
-        );
+        load_to_shared_memories::<F, FC>(lhs, rhs, offsets, shared_memories, dims, config);
 
         sync_units();
 
-        compute_loop::<F, FC>(
-            shared_memories,
-            &mut accumulators,
-            runtime_info.ids,
-            comptime_info,
-        );
+        compute_loop::<F, FC>(shared_memories, accumulators, config);
 
         sync_units();
     }
 
-    if Comptime::get(write_out_reuse_smem) {
-        ReuseSmemWriter::write_to_output(out, accumulators, runtime_info, comptime_info);
-    } else {
-        LargeSmemWriter::write_to_output(out, accumulators, runtime_info, comptime_info);
-    }
+    write_to_output::<F>(out, accumulators, offsets, dims, config);
 }

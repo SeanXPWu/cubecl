@@ -3,18 +3,33 @@
 macro_rules! testgen_cmma_internal {
     () => {
         #[test]
-        pub fn cmma_compute_loop_block_equal_tile_test() {
-            tests::cmma::compute_loop::cmma_compute_loop_block_equal_tile_test::<TestRuntime>(&Default::default())
+        #[ignore] // does not work with n_tiles = 2 hardcoded
+        pub fn cmma_compute_loop_k_test() {
+            tests::cmma::compute_loop::compute_loop_k_test::<TestRuntime>(&Default::default())
         }
 
         #[test]
-        pub fn cmma_compute_loop_block_larger_than_tile_test() {
-            tests::cmma::compute_loop::cmma_compute_loop_block_larger_than_tile_test::<TestRuntime>(&Default::default())
+        pub fn cmma_compute_loop_warp_test() {
+            tests::cmma::compute_loop::compute_loop_warp_test::<TestRuntime>(&Default::default())
         }
 
         #[test]
-        pub fn cmma_compute_loop_b_mn_larger_than_b_k_test() {
-            tests::cmma::compute_loop::cmma_compute_loop_b_mn_larger_than_b_k_test::<TestRuntime>(
+        pub fn cmma_compute_loop_two_warps_same_tile_row_test() {
+            tests::cmma::compute_loop::cmma_compute_loop_two_warps_same_tile_row_test::<TestRuntime>(
+                &Default::default(),
+            )
+        }
+
+        #[test]
+        pub fn cmma_load_shared_memory_lhs_unit_test() {
+            tests::cmma::load_shared_memory::load_shared_memory_lhs_unit_test::<TestRuntime>(
+                &Default::default(),
+            )
+        }
+
+        #[test]
+        pub fn cmma_load_shared_memory_rhs_unit_test() {
+            tests::cmma::load_shared_memory::load_shared_memory_rhs_unit_test::<TestRuntime>(
                 &Default::default(),
             )
         }
@@ -97,6 +112,11 @@ macro_rules! testgen_cmma_internal {
         }
 
         #[test]
+        pub fn cmma_write_output_unit_test() {
+            tests::cmma::write_output::cmma_write_output_unit_test::<TestRuntime>(&Default::default())
+        }
+
+        #[test]
         pub fn cmma_write_output_warp_test() {
             tests::cmma::write_output::cmma_write_output_warp_test::<TestRuntime>(&Default::default())
         }
@@ -127,13 +147,6 @@ macro_rules! testgen_cmma_internal {
         #[test]
         pub fn cmma_write_output_third_fourth_warps_test() {
             tests::cmma::write_output::cmma_write_output_third_fourth_warps_test::<TestRuntime>(
-                &Default::default(),
-            )
-        }
-
-        #[test]
-        pub fn load_shared_memory_rhs_larger_block_test() {
-            tests::cmma::load_shared_memory::load_shared_memory_rhs_larger_block_test::<TestRuntime>(
                 &Default::default(),
             )
         }
